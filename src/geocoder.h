@@ -5,6 +5,7 @@
 
 #include <kchashdb.h>
 #include <marisa.h>
+#include <memory>
 #include <sqlite3pp.h>
 
 #include <cctype>
@@ -14,64 +15,76 @@
 namespace GeoNLP
 {
 
+struct GeoResult
+{
+  long long int id;
+  double        latitude;
+  double        longitude;
+  double        distance = 0;
+  std::string   title;
+  std::string   address;
+  std::string   type;
+  std::string   phone;
+  std::string   postal_code;
+  std::string   website;
+  size_t        levels_resolved;
+  size_t        admin_levels = 0;
+  double        search_rank;
+
+  double get_latitude() const { return latitude; }
+  double get_longitude() const { return longitude; }
+  double get_distance() const { return distance; }
+  double get_search_rank() const { return search_rank; }
+  const std::string &get_title() const { return title; }
+  const std::string &get_address() const { return address; }
+  const std::string &get_type() const { return type; }
+  const std::string &get_phone() const { return phone; }
+  const std::string &get_postal_code() const { return postal_code; }
+  const std::string &get_website() const { return website; }
+  size_t get_levels_resolved() const { return levels_resolved; }
+  size_t get_admin_levels() const { return admin_levels; }
+
+  bool operator<(const GeoResult &i) const
+  {
+    return (search_rank < i.search_rank
+            || (search_rank == i.search_rank && address.length() < i.address.length())
+            || (search_rank == i.search_rank && address.length() == i.address.length()
+                && address < i.address));
+  }
+};
+
+class GeoReference
+{
+public:
+  GeoReference();
+  GeoReference(double lat, double lon, int zoom = 16, double importance = 0.75);
+
+  void set(double lat, double lon, int zoom = 16, double importance = 0.75);
+  void reset();
+
+  bool   is_set() const { return m_is_set; }
+  int    zoom() const { return m_zoom; }
+  double importance() const { return m_importance; }
+  double distance(const GeoResult &r) const;
+
+private:
+  double m_latitude;
+  double m_longitude;
+  double m_importance;
+  int    m_zoom;
+  bool   m_is_set;
+};
+
+
 class Geocoder
 {
-
 public:
-  struct GeoResult
-  {
-    long long int id;
-    double        latitude;
-    double        longitude;
-    double        distance = 0;
-    std::string   title;
-    std::string   address;
-    std::string   type;
-    std::string   phone;
-    std::string   postal_code;
-    std::string   website;
-    size_t        levels_resolved;
-    size_t        admin_levels = 0;
-    double        search_rank;
-
-    bool operator<(const GeoResult &i) const
-    {
-      return (search_rank < i.search_rank
-              || (search_rank == i.search_rank && address.length() < i.address.length())
-              || (search_rank == i.search_rank && address.length() == i.address.length()
-                  && address < i.address));
-    }
-  };
-
-  class GeoReference
-  {
-  public:
-    GeoReference();
-    GeoReference(double lat, double lon, int zoom = 16, double importance = 0.75);
-
-    void set(double lat, double lon, int zoom = 16, double importance = 0.75);
-    void reset();
-
-    bool   is_set() const { return m_is_set; }
-    int    zoom() const { return m_zoom; }
-    double importance() const { return m_importance; }
-    double distance(const GeoResult &r) const;
-
-  private:
-    double m_latitude;
-    double m_longitude;
-    double m_importance;
-    int    m_zoom;
-    bool   m_is_set;
-  };
-
   typedef uint32_t index_id_key;
   typedef uint32_t index_id_value;
 
   static const int    version;
   static const size_t num_languages; ///< Number of languages supported by this version
 
-public:
   Geocoder();
   Geocoder(const std::string &dbpath);
 
@@ -79,7 +92,7 @@ public:
 
   /// \brief Search for any objects matching the normalized query
   ///
-  bool search(const std::vector<Postal::ParseResult> &parsed_query, std::vector<GeoResult> &result,
+  bool search(const std::vector<ParseResult> &parsed_query, std::vector<GeoResult> &result,
               size_t min_levels = 0, const GeoReference &reference = GeoReference());
 
   /// \brief Search for objects within given radius from specified point and matching the query
@@ -179,7 +192,7 @@ public:
                            index_id_value range1, index_id_value **idx0, index_id_value **idx1);
 
   // support for sorting by distance
-  static bool distcomp(const Geocoder::GeoResult &i, const Geocoder::GeoResult &j)
+  static bool distcomp(const GeoResult &i, const GeoResult &j)
   {
     return (i.distance < j.distance);
   }
@@ -196,7 +209,7 @@ public:
                              double reference_longitude);
 
 protected:
-  bool search(const Postal::Hierarchy &parsed, const std::string &postal_code,
+  bool search(const Hierarchy &parsed, const std::string &postal_code,
               std::vector<GeoResult> &result, size_t level = 0, long long int range0 = 0,
               long long int range1 = 0);
 
@@ -236,6 +249,12 @@ protected:
 
   std::string m_preferred_result_language;
 };
+
+std::unique_ptr<Geocoder> new_geocoder();
+
+std::unique_ptr<GeoReference> new_geo_reference(double lat, double lon, int zoom, double importance);
+
+std::unique_ptr<GeoReference> empty_geo_reference();
 
 }
 #endif // GEOCODER_H

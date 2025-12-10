@@ -7,6 +7,7 @@
 #include <functional>
 #include <iostream>
 #include <locale>
+#include <memory>
 #include <set>
 #include <sstream>
 
@@ -45,9 +46,9 @@ static void str2vecchar(const std::string &s, std::vector<char> &v)
 static inline std::string &ltrim(std::string &s)
 {
   s.erase(s.begin(),
-	  std::find_if(s.begin(), s.end(), [](unsigned char ch) {
-	    return !std::isspace(ch);
-	  }));
+      std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+        return !std::isspace(ch);
+      }));
   return s;
 }
 
@@ -185,7 +186,7 @@ void Postal::drop()
 /// Normalize first, expand next. Seems to miss few expansions in current implementation
 /// Have to wait for new libpostal version to switch to this approach
 
-// bool Postal::parse(const std::string &input, std::vector<Postal::ParseResult> &result)
+// bool Postal::parse(const std::string &input, std::vector<ParseResult> &result)
 //{
 //     if (!init()) return false;
 
@@ -225,8 +226,8 @@ void Postal::drop()
 //////////////////////////////////////////////////////////////
 /// expand first then normalize
 
-bool Postal::parse(const std::string &input, std::vector<Postal::ParseResult> &result,
-                   Postal::ParseResult &nonormalization)
+bool Postal::parse(const std::string &input, std::vector<ParseResult> &result,
+                   ParseResult &nonormalization)
 {
   if (m_use_postal && !init())
     return false;
@@ -294,7 +295,7 @@ bool Postal::parse(const std::string &input, std::vector<Postal::ParseResult> &r
   return true;
 }
 
-void Postal::expand(const Postal::ParseResult &input, std::vector<Postal::ParseResult> &result)
+void Postal::expand(const ParseResult &input, std::vector<ParseResult> &result)
 {
   if (!init())
     {
@@ -462,4 +463,66 @@ void Postal::result2hierarchy(const std::vector<ParseResult> &p, std::vector<Hie
 
       h.push_back(h_result);
     }
+}
+
+std::unique_ptr<Postal> GeoNLP::new_postal() {
+    return std::unique_ptr<Postal>(new Postal());
+}
+
+std::unique_ptr<ParseResult> GeoNLP::new_parse_result() {
+    return std::unique_ptr<ParseResult>(new ParseResult());
+}
+
+std::unique_ptr<NiceParseResult> GeoNLP::new_nice_parse_result(const ParseResult &result) {
+    std::unique_ptr<NiceParseResult> nice_result(new NiceParseResult);
+
+    auto country_element = result.find(ADDRESS_PARSER_LABEL_COUNTRY);
+    if (country_element != result.end())
+        nice_result->country = country_element->second;
+
+    auto country_region_element = result.find(ADDRESS_PARSER_LABEL_COUNTRY_REGION);
+    if (country_region_element != result.end())
+        nice_result->country_region = country_region_element->second;
+
+    auto state_element = result.find(ADDRESS_PARSER_LABEL_STATE);
+    if (state_element != result.end())
+        nice_result->state = state_element->second;
+
+    auto state_district_element = result.find(ADDRESS_PARSER_LABEL_STATE_DISTRICT);
+    if (state_district_element != result.end())
+        nice_result->state_district = state_district_element->second;
+
+    auto island_element = result.find(ADDRESS_PARSER_LABEL_ISLAND);
+    if (island_element != result.end())
+        nice_result->island = island_element->second;
+
+    auto city_element = result.find(ADDRESS_PARSER_LABEL_CITY);
+    if (city_element != result.end())
+        nice_result->city = city_element->second;
+
+    auto city_district_element = result.find(ADDRESS_PARSER_LABEL_CITY_DISTRICT);
+    if (city_district_element != result.end())
+        nice_result->city_district = city_district_element->second;
+
+    auto suburb_element = result.find(ADDRESS_PARSER_LABEL_SUBURB);
+    if (suburb_element != result.end())
+        nice_result->suburb = suburb_element->second;
+
+    auto road_element = result.find(ADDRESS_PARSER_LABEL_ROAD);
+    if (road_element != result.end())
+        nice_result->road = road_element->second;
+
+    auto house_number_element = result.find(ADDRESS_PARSER_LABEL_HOUSE_NUMBER);
+    if (house_number_element != result.end())
+        nice_result->house_number = house_number_element->second;
+
+    auto category_element = result.find(ADDRESS_PARSER_LABEL_CATEGORY);
+    if (category_element != result.end())
+        nice_result->category = category_element->second;
+
+    auto house_element = result.find(ADDRESS_PARSER_LABEL_HOUSE);
+    if (house_element != result.end())
+        nice_result->house = house_element->second;
+
+    return nice_result;
 }

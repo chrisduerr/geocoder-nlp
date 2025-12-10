@@ -4,6 +4,7 @@
 #include <boost/geometry.hpp>
 #include <deque>
 #include <iostream>
+#include <memory>
 #include <set>
 #include <sstream>
 
@@ -32,14 +33,14 @@ static double distance_per_longitude(double latitude)
 ////////////////////
 // GeoReference class
 
-Geocoder::GeoReference::GeoReference() : m_is_set(false) {}
+GeoReference::GeoReference() : m_is_set(false) {}
 
-Geocoder::GeoReference::GeoReference(double lat, double lon, int zoom, double importance)
+GeoReference::GeoReference(double lat, double lon, int zoom, double importance)
     : m_latitude(lat), m_longitude(lon), m_importance(importance), m_zoom(zoom), m_is_set(true)
 {
 }
 
-void Geocoder::GeoReference::set(double lat, double lon, int zoom, double importance)
+void GeoReference::set(double lat, double lon, int zoom, double importance)
 {
   m_latitude   = lat;
   m_longitude  = lon;
@@ -48,12 +49,12 @@ void Geocoder::GeoReference::set(double lat, double lon, int zoom, double import
   m_is_set     = true;
 }
 
-void Geocoder::GeoReference::reset()
+void GeoReference::reset()
 {
   m_is_set = false;
 }
 
-double Geocoder::GeoReference::distance(const Geocoder::GeoResult &r) const
+double GeoReference::distance(const GeoResult &r) const
 {
   point_t ref(m_longitude, m_latitude);
   point_t q(r.longitude, r.latitude);
@@ -218,15 +219,15 @@ static std::string v2s(const std::vector<std::string> &v)
 }
 #endif
 
-bool Geocoder::search(const std::vector<Postal::ParseResult> &parsed_query,
-                      std::vector<Geocoder::GeoResult> &result, size_t min_levels,
+bool Geocoder::search(const std::vector<ParseResult> &parsed_query,
+                      std::vector<GeoResult> &result, size_t min_levels,
                       const GeoReference &reference)
 {
   if (!m_database_open)
     return false;
 
   // parse query by libpostal
-  std::vector<Postal::Hierarchy> parsed_result;
+  std::vector<Hierarchy> parsed_result;
   std::string                    postal_code;
 
   Postal::result2hierarchy(parsed_query, parsed_result, postal_code);
@@ -313,8 +314,8 @@ bool Geocoder::search(const std::vector<Postal::ParseResult> &parsed_query,
   return true;
 }
 
-bool Geocoder::search(const Postal::Hierarchy &parsed, const std::string &postal_code,
-                      std::vector<Geocoder::GeoResult> &result, size_t level, long long int range0,
+bool Geocoder::search(const Hierarchy &parsed, const std::string &postal_code,
+                      std::vector<GeoResult> &result, size_t level, long long int range0,
                       long long int range1)
 {
   /// Special case of search made by postal code only
@@ -1039,4 +1040,16 @@ double Geocoder::search_rank_location_bias(double distance, int zoom)
   zoom          = std::max(zoom, 18);
   double radius = (1 << (18 - zoom)) * 250; // meters
   return exp(-distance / radius);
+}
+
+std::unique_ptr<Geocoder> GeoNLP::new_geocoder() {
+    return std::unique_ptr<Geocoder>(new Geocoder());
+}
+
+std::unique_ptr<GeoReference> GeoNLP::new_geo_reference(double lat, double lon, int zoom, double importance) {
+    return std::unique_ptr<GeoReference>(new GeoReference(lat, lon, zoom, importance));
+}
+
+std::unique_ptr<GeoReference> GeoNLP::empty_geo_reference() {
+    return std::unique_ptr<GeoReference>(new GeoReference());
 }
